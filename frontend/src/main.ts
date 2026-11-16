@@ -113,6 +113,9 @@ const micMonitor = createMicMonitor(
     micDot.classList.toggle("is-hot", level > 0.02);
   },
   (event: string) => {
+    // Muted on purpose: the recogniser is meant to be silent, so this is not
+    // deafness and there is nothing to restart.
+    if (isMuted && event.startsWith("DEAF")) return;
     socket.send({ type: "mic", text: event });
     // Proven deaf: sound going in, nothing coming out. Do not wait for the
     // rotation timer to happen along — measured once at 21 seconds, all of
@@ -238,7 +241,11 @@ btnMute.addEventListener("click", (e) => {
   e.stopPropagation();
   isMuted = !isMuted;
   btnMute.classList.toggle("muted", isMuted);
+  // Muting silences the recogniser for good until unmuted, and from the log
+  // alone that looks exactly like a dead mic. Say so.
+  socket.send({ type: "mic", text: isMuted ? "muted with the mute button" : "unmuted with the mute button" });
   if (isMuted) {
+    showError("Microphone muted — click the mic button again to unmute.");
     voiceInput.pause();
     transition("idle");
   } else {
