@@ -470,10 +470,7 @@ async def synthesize_speech(text: str) -> Optional[bytes]:
         async with httpx.AsyncClient(timeout=15.0) as http:
             response = await http.post(
                 FISH_API_URL,
-                headers={
-                    "Authorization": f"Bearer {FISH_API_KEY}",
-                    "Content-Type": "application/json",
-                },
+                headers=tts.fish_headers(FISH_API_KEY),
                 json={
                     "text": text,
                     "reference_id": FISH_VOICE_ID,
@@ -6857,7 +6854,7 @@ async def api_test_fish(body: KeyTest):
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
                 "https://api.fish.audio/v1/tts",
-                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                headers=tts.fish_headers(key),
                 json={"text": "test", "reference_id": FISH_VOICE_ID},
             )
             if resp.status_code in (200, 201):

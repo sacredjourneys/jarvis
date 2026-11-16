@@ -18,6 +18,18 @@ log = logging.getLogger("jarvis.tts")
 FISH_TTS_URL = "https://api.fish.audio/v1/tts"
 
 
+def fish_headers(api_key: str) -> dict:
+    """Request headers for Fish Audio. FISH_MODEL picks the model; without a
+    `model` header Fish uses its paid default, which fails with 402 once the
+    account has no API credit. Read at call time so a .env change applies."""
+    import os
+    return {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "model": os.getenv("FISH_MODEL", "s2.1-pro-free"),
+    }
+
+
 @dataclass
 class SynthResult:
     audio: bytes
@@ -39,7 +51,7 @@ async def synthesize_chunk(text: str, *, api_key: str, voice_id: str,
     try:
         async with client.stream(
             "POST", FISH_TTS_URL,
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            headers=fish_headers(api_key),
             json={"text": text, "reference_id": voice_id, "format": "mp3", "mp3_bitrate": 128, "latency": latency},
             timeout=timeout,
         ) as resp:
