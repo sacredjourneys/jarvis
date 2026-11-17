@@ -17,7 +17,18 @@ import "./style.css";
 
 type State = "idle" | "listening" | "thinking" | "speaking" | "compacting";
 let currentState: State = "idle";
-let isMuted = false;
+// Mute is the user's decision and outlives the page: the tab reloads on its
+// own (sleep/wake, the dev server reconnecting, Chrome discarding a background
+// tab), and a reload used to bring him back listening. Only the mute button
+// changes this; nothing he says or does unmutes him.
+const MUTE_KEY = "jarvis.muted";
+function loadMuted(): boolean {
+  try { return localStorage.getItem(MUTE_KEY) === "1"; } catch { return false; }
+}
+function saveMuted(muted: boolean) {
+  try { localStorage.setItem(MUTE_KEY, muted ? "1" : "0"); } catch { /* private mode: session only */ }
+}
+let isMuted = loadMuted();
 
 const statusEl = document.getElementById("status-text")!;
 const errorEl = document.getElementById("error-text")!;
@@ -208,7 +219,13 @@ socket.onMessage((msg) => {
 // ---------------------------------------------------------------------------
 
 // Start listening after a brief delay for the orb to render
+// unless he was muted when the page last closed: then the mic stays off.
 setTimeout(() => {
+  if (isMuted) {
+    socket.send({ type: "mic", text: "page loaded muted; mic stays off until unmuted" });
+    showError("Microphone muted — click the mic button to unmute.");
+    return;
+  }
   voiceInput.start();
   if (currentState !== "speaking") transition("listening");
 }, 1000);
@@ -240,6 +257,7 @@ const btnFixSelf = document.getElementById("btn-fix-self")!;
 btnMute.addEventListener("click", (e) => {
   e.stopPropagation();
   isMuted = !isMuted;
+  saveMuted(isMuted);
   btnMute.classList.toggle("muted", isMuted);
   // Muting silences the recogniser for good until unmuted, and from the log
   // alone that looks exactly like a dead mic. Say so.
@@ -249,10 +267,14 @@ btnMute.addEventListener("click", (e) => {
     voiceInput.pause();
     transition("idle");
   } else {
-    voiceInput.resume();
+    showError("");
+    // start(), not resume(): if the page loaded muted the recogniser was
+    // never started, and resume() only wakes one that was.
+    voiceInput.start();
     transition("listening");
   }
 });
+btnMute.classList.toggle("muted", isMuted);
 
 btnMenu.addEventListener("click", (e) => {
   e.stopPropagation();
